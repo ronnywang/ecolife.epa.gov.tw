@@ -80,25 +80,24 @@ class Crawler
         }
     }
 
-    public function main()
+    public function main($argv)
     {
-        foreach (range(2008, 2012) as $year) {
-            foreach (range(1, 12) as $month){
-                if ($year == 2008 and $month < 10) {
-                    continue;
+        $year = $argv[1];
+        $month = $argv[2];
+        if (!$year or !$month) {
+            throw new Exception("Usage: php crawler.php <year> <month>");
+        }
+
+        $fp = fopen(__DIR__ . "/outputs/{$year}-{$month}.csv", "w");
+        foreach ($this->getCountryList($year) as $county_id => $county_name) {
+            foreach ($this->getTownsFromCountry($county_id, $year) as $town_id => $town_name) {
+                $ret = $this->getDataFromTown($year, $month, $county_id, $county_name, $town_id, $town_name);
+                foreach ($ret as $village_name => $count) {
+                    fputcsv($fp, array($county_id, $county_name, $town_id, $town_name, $village_name, $count));
                 }
-                $fp = fopen(__DIR__ . "/outputs/{$year}-{$month}.csv", "w");
-                foreach ($this->getCountryList($year) as $county_id => $county_name) {
-                    foreach ($this->getTownsFromCountry($county_id, $year) as $town_id => $town_name) {
-                        $ret = $this->getDataFromTown($year, $month, $county_id, $county_name, $town_id, $town_name);
-                        foreach ($ret as $village_name => $count) {
-                            fputcsv($fp, array($county_id, $county_name, $town_id, $town_name, $village_name, $count));
-                        }
-                    }
-                }
-                fclose ($fp);
             }
         }
+        fclose ($fp);
     }
 
     public function getDataFromTown($year, $month, $county_id, $county_name, $town_id, $town_name)
@@ -165,4 +164,4 @@ class Crawler
 }
 
 $c = new Crawler;
-$c->main();
+$c->main($_SERVER['argv']);
