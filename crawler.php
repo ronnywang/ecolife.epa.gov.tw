@@ -1,5 +1,7 @@
 <?php
 
+class NoTownDataException extends Exception { }
+
 class Crawler
 {
     public function getTownsFromCountry($id, $year)
@@ -82,22 +84,97 @@ class Crawler
 
     public function main($argv)
     {
-        $year = $argv[1];
-        $month = $argv[2];
-        if (!$year or !$month) {
-            throw new Exception("Usage: php crawler.php <year> <month>");
+        $type = $argv[1];
+        $year = $argv[2];
+        $month = $argv[3];
+        if (!$year or !$month or !in_array($type, array('town', 'village'))) {
+            throw new Exception("Usage: php crawler.php <town or village> <year> <month>");
         }
 
-        $fp = fopen(__DIR__ . "/outputs/{$year}-{$month}.csv", "w");
+        $fp = fopen(__DIR__ . "/outputs/{$type}/{$year}-{$month}.csv", "w");
         foreach ($this->getCountryList($year) as $county_id => $county_name) {
-            foreach ($this->getTownsFromCountry($county_id, $year) as $town_id => $town_name) {
-                $ret = $this->getDataFromTown($year, $month, $county_id, $county_name, $town_id, $town_name);
-                foreach ($ret as $village_name => $count) {
-                    fputcsv($fp, array($county_id, $county_name, $town_id, $town_name, $village_name, $count));
+            $towns = $this->getTownsFromCountry($county_id, $year);
+            if ('village' == $type) {
+                foreach ($towns as $town_id => $town_name) {
+                    $ret = $this->getDataFromTown($year, $month, $county_id, $county_name, $town_id, $town_name);
+                    foreach ($ret as $village_name => $count) {
+                        fputcsv($fp, array($county_id, $county_name, $town_id, $town_name, $village_name, $count));
+                    }
+                }
+            } else {
+                $ret = $this->getDataFromCounty($year, $month, $county_id, $county_name);
+                foreach ($ret as $town_name => $count) {
+                    $town_id = array_search($town_name, $towns);
+                    fputcsv($fp, array($county_id, $county_name, $town_id, $town_name, '總計', $count));
                 }
             }
         }
         fclose ($fp);
+    }
+
+    public function getDataFromCounty($year, $month, $county_id, $county_name)
+    {
+        $url = 'http://ecolife.epa.gov.tw/Cooler/effect/Electricity_Area.aspx';
+
+        $curl = curl_init();
+        curl_setopt($curl, CURLOPT_URL, $url);
+        curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($curl, CURLOPT_COOKIEFILE, 'cookie');
+        curl_setopt($curl, CURLOPT_REFERER, $url);
+        curl_setopt($curl, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/29.0.1547.66 Safari/537.36');
+
+        $ret = curl_exec($curl);
+        preg_match('#<input type="hidden" name="__VIEWSTATE" id="__VIEWSTATE" value="([^"]*)"#', $ret, $matches);
+
+        $params = array();
+        $params['ctl00$ctl00$SCM'] = 'ctl00$ctl00$SCM|ctl00$ctl00$cphMain$cphMain$btnAdvanceSearch';
+        $params['ctl00$ctl00$cphMain$yAxle$y_login$txtID'] = '';
+        $params['ctl00$ctl00$cphMain$yAxle$y_login$txtPWD'] = '';
+        $params['ctl00$ctl00$cphMain$yAxle$hDirtyID'] = '';
+        $params['ctl00$ctl00$cphMain$yAxle$hUrl'] = '';
+        $params['ctl00$ctl00$cphMain$cphMain$ucStatisticsType$chbMonthStatistics'] = 'on';
+        $params['ctl00$ctl00$cphMain$cphMain$ucStatisticsType$ddlMonthStatistics_Year'] = $year;
+        $params['ctl00$ctl00$cphMain$cphMain$ucStatisticsType$ddlMonthStatistics_Month'] = $month;
+        $params['ctl00$ctl00$cphMain$cphMain$ucPubQryArea$cboCity'] = $county_id;
+        $params['ctl00$ctl00$cphMain$cphMain$ucPubQryArea$cboDistrict'] = '';
+        $params['ctl00$ctl00$cphMain$cphMain$ucPubQryArea$cddCity_ClientState'] = "{$county_id}:::{$county_name}";
+        $params['ctl00$ctl00$cphMain$cphMain$ucPubQryArea$cddDistrict_ClientState'] = ":::";
+        $params['ctl00$ctl00$cphMain$cphMain$ucPubQryArea$cddVillage_ClientState'] = '';
+        $params['ctl00$ctl00$cphMain$cphMain$hidStatisticsType'] = '';
+        $params['ctl00$ctl00$cphMain$cphMain$hidStatisticsYear'] = '';
+        $params['ctl00$ctl00$cphMain$cphMain$hidStatisticsMonth'] = '';
+        $params['hiddenInputToUpdateATBuffer_CommonToolkitScripts'] = '1';
+        $params['__EVENTTARGET'] = '';
+        $params['__EVENTARGUMENT'] = '';
+        $params['__LASTFOCUS'] = '';
+        $params['__VIEWSTATE'] = ($matches[1]);
+        $params['__ASYNCPOST'] = "true";
+        $params['ctl00$ctl00$cphMain$cphMain$btnAdvanceSearch'] = "查詢";
+
+        curl_setopt($curl, CURLOPT_URL, $url);
+        curl_setopt($curl, CURLOPT_HTTPHEADER, array('X-MicrosoftAjax' => 'Delta=true'));
+        curl_setopt($curl, CURLOPT_POSTFIELDS, http_build_query($params));
+        curl_setopt($curl, CURLOPT_REFERER, $url);
+        curl_setopt($curl, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/29.0.1547.66 Safari/537.36');
+
+        $content = curl_exec($curl);
+        if (strpos($content, '很抱歉，目前村里用電統計資料僅有2008年10月至2013年12月之資料，因此無法與去年同期用電量作比較！')) {
+            throw new NoTownDataException();
+        }
+
+        $doc = new DOMDocument;
+        @$doc->loadHTML('<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"></head><body>' . $content . '</body></html>');
+
+        $ret = array();
+        foreach ($doc->getElementsByTagName('tr') as $tr_dom) {
+            $td_doms = $tr_dom->getElementsByTagName('td');
+            if ($td_doms->length == 5) {
+                $ret[trim($td_doms->item(1)->nodeValue)] = trim(str_replace(',', '', $td_doms->item(2)->nodeValue));
+            } elseif ($td_doms->length == 4) {
+                $ret[trim($td_doms->item(0)->nodeValue)] = trim(str_replace(',', '', $td_doms->item(1)->nodeValue));
+            }
+        }
+        return $ret;
     }
 
     public function getDataFromTown($year, $month, $county_id, $county_name, $town_id, $town_name)
@@ -146,6 +223,9 @@ class Crawler
         curl_setopt($curl, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/29.0.1547.66 Safari/537.36');
 
         $content = curl_exec($curl);
+        if (strpos($content, '很抱歉，目前村里用電統計資料僅有2008年10月至2013年12月之資料，因此無法與去年同期用電量作比較！')) {
+            throw new NoTownDataException();
+        }
 
         $doc = new DOMDocument;
         @$doc->loadHTML('<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"></head><body>' . $content . '</body></html>');
