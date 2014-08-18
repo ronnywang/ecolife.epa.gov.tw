@@ -98,6 +98,7 @@ class Crawler
                 foreach ($towns as $town_id => $town_name) {
                     $ret = $this->getDataFromTown($year, $month, $county_id, $county_name, $town_id, $town_name);
                     foreach ($ret as $village_name => $count) {
+                        error_log($village_name);
                         fputcsv($fp, array($county_id, $county_name, $town_id, $town_name, $village_name, $count));
                     }
                 }
@@ -158,7 +159,7 @@ class Crawler
         curl_setopt($curl, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/29.0.1547.66 Safari/537.36');
 
         $content = curl_exec($curl);
-        if (strpos($content, '很抱歉，目前村里用電統計資料僅有2008年10月至2013年12月之資料，因此無法與去年同期用電量作比較！')) {
+        if (strpos($content, '月之資料，因此無法與去年同期用電量作比較！')) {
             throw new NoTownDataException();
         }
 
@@ -208,12 +209,13 @@ class Crawler
         $params['ctl00$ctl00$cphMain$cphMain$hidStatisticsType'] = '';
         $params['ctl00$ctl00$cphMain$cphMain$hidStatisticsYear'] = '';
         $params['ctl00$ctl00$cphMain$cphMain$hidStatisticsMonth'] = '';
-        $params['hiddenInputToUpdateATBuffer_CommonToolkitScripts'] = '1';
+        $params['hiddenInputToUpdateATBuffer_CommonToolkitScripts'] = '0';
         $params['__EVENTTARGET'] = '';
         $params['__EVENTARGUMENT'] = '';
         $params['__LASTFOCUS'] = '';
         $params['__VIEWSTATE'] = ($matches[1]);
         $params['__ASYNCPOST'] = "true";
+        $params['__VIEWSTATEENCRYPTED'] = '';
         $params['ctl00$ctl00$cphMain$cphMain$btnAdvanceSearch'] = "查詢";
 
         curl_setopt($curl, CURLOPT_URL, $url);
@@ -223,7 +225,7 @@ class Crawler
         curl_setopt($curl, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/29.0.1547.66 Safari/537.36');
 
         $content = curl_exec($curl);
-        if (strpos($content, '很抱歉，目前村里用電統計資料僅有2008年10月至2013年12月之資料，因此無法與去年同期用電量作比較！')) {
+        if (strpos($content, '月之資料，因此無法與去年同期用電量作比較！')) {
             throw new NoTownDataException();
         }
 
@@ -233,7 +235,9 @@ class Crawler
         $ret = array();
         foreach ($doc->getElementsByTagName('tr') as $tr_dom) {
             $td_doms = $tr_dom->getElementsByTagName('td');
-            if ($td_doms->length == 5) {
+            if ($td_doms->length == 6) {
+                $ret[trim($td_doms->item(2)->nodeValue)] = trim(str_replace(',', '', $td_doms->item(3)->nodeValue));
+            } elseif ($td_doms->length == 5) {
                 $ret[trim($td_doms->item(1)->nodeValue)] = trim(str_replace(',', '', $td_doms->item(2)->nodeValue));
             } elseif ($td_doms->length == 4) {
                 $ret[trim($td_doms->item(0)->nodeValue)] = trim(str_replace(',', '', $td_doms->item(1)->nodeValue));
