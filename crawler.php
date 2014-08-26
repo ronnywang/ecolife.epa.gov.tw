@@ -144,12 +144,13 @@ class Crawler
         $params['ctl00$ctl00$cphMain$cphMain$hidStatisticsType'] = '';
         $params['ctl00$ctl00$cphMain$cphMain$hidStatisticsYear'] = '';
         $params['ctl00$ctl00$cphMain$cphMain$hidStatisticsMonth'] = '';
-        $params['hiddenInputToUpdateATBuffer_CommonToolkitScripts'] = '1';
+        $params['hiddenInputToUpdateATBuffer_CommonToolkitScripts'] = '0';
         $params['__EVENTTARGET'] = '';
         $params['__EVENTARGUMENT'] = '';
         $params['__LASTFOCUS'] = '';
         $params['__VIEWSTATE'] = ($matches[1]);
         $params['__ASYNCPOST'] = "true";
+        $params['__VIEWSTATEENCRYPTED'] = '';
         $params['ctl00$ctl00$cphMain$cphMain$btnAdvanceSearch'] = "查詢";
 
         curl_setopt($curl, CURLOPT_URL, $url);
