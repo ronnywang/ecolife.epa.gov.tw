@@ -6,7 +6,7 @@ class Crawler
 {
     public function getTownsFromCountry($id, $year)
     {
-        if ($year <= 2011) {
+        if ($year < 2011) {
             $url = 'http://ecolife.epa.gov.tw/Cooler/_ws/wsBase.asmx/GetDistrictNoZip_Old';
         } else {
             $url = 'http://ecolife.epa.gov.tw/Cooler/_ws/wsBase.asmx/GetDistrictNoZip';
@@ -26,7 +26,7 @@ class Crawler
 
     public function getCountryList($year)
     {
-        if ($year <= 2011) {
+        if ($year < 2011) {
             return array(
                 63000 => '臺北市',
                 10001 => '臺北縣',
@@ -54,7 +54,7 @@ class Crawler
                 10011 => '臺南縣',
                 10006 => '臺中縣',
             );
-        } else {
+        } elseif ($year < 2015) {
             return array(
                 63000 => '臺北市',
                 10001 => '新北市',
@@ -63,6 +63,31 @@ class Crawler
                 64000 => '高雄市',
                 10002 => '宜蘭縣',
                 10003 => '桃園縣',
+                10004 => '新竹縣',
+                10005 => '苗栗縣',
+                10007 => '彰化縣',
+                10008 => '南投縣',
+                10009 => '雲林縣',
+                10010 => '嘉義縣',
+                10013 => '屏東縣',
+                10014 => '臺東縣',
+                10015 => '花蓮縣',
+                10016 => '澎湖縣',
+                10017 => '基隆市',
+                10018 => '新竹市',
+                10020 => '嘉義市',
+                09020 => '金門縣',
+                09007 => '連江縣',
+            );
+        } else {
+            return array(
+                63000 => '臺北市',
+                10001 => '新北市',
+                10019 => '臺中市',
+                10021 => '臺南市',
+                64000 => '高雄市',
+                10002 => '宜蘭縣',
+                10003 => '桃園市',
                 10004 => '新竹縣',
                 10005 => '苗栗縣',
                 10007 => '彰化縣',
@@ -90,6 +115,7 @@ class Crawler
         if (!$year or !$month or !in_array($type, array('town', 'village'))) {
             throw new Exception("Usage: php crawler.php <town or village> <year> <month>");
         }
+
 
         $fp = fopen(__DIR__ . "/outputs/{$type}/{$year}-{$month}.csv", "w");
         foreach ($this->getCountryList($year) as $county_id => $county_name) {
@@ -226,8 +252,8 @@ class Crawler
         curl_setopt($curl, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/29.0.1547.66 Safari/537.36');
 
         $content = curl_exec($curl);
-        if (strpos($content, '月之資料，因此無法與去年同期用電量作比較！')) {
-            throw new NoTownDataException();
+        if (preg_match('#很抱歉.*月之資料，因此無法與去年同期用電量作比較！#', $content, $matches)) {
+            throw new NoTownDataException($matches[0]);
         }
 
         $doc = new DOMDocument;
